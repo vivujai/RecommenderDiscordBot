@@ -1,4 +1,13 @@
+numpy
+openssl
+pandas
+scikit-surprise
+scipy
 aiohttp
 aiosqlite
-discord.py
+discord-py
+fuzzywuzzy
 python-dotenv
+python-levenshtein
+scikit-learn
+openai

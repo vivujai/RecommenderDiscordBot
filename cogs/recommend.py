@@ -9,15 +9,17 @@ import asyncio
 from dotenv import load_dotenv
 
 
-OPEN_AI_API_KEY = os.getenv("OPEN_AI_KEY")
-OPEN_AI_ASSISTANTS_ID = os.getenv("OPEN_ASSISTANT_ID")
+load_dotenv()
 
+API_KEY = os.getenv("API_KEY")
 
 
 
 client = OpenAI(
-    api_key=OPEN_AI_API_KEY, 
+  base_url="https://openrouter.ai/api/v1",
+  api_key=f"{API_KEY}",
 )
+
 # Main recommend COG class
 class Recommend(commands.Cog, name="recommend"):
     def __init__(self, bot) -> None:
@@ -36,6 +38,8 @@ class Recommend(commands.Cog, name="recommend"):
         # Initialize and train model
         self.algo = SVD()
         self.retrain_model()
+
+        
 
     # Init function to load all registered users with the bot
     def load_users(self):
@@ -109,6 +113,20 @@ class Recommend(commands.Cog, name="recommend"):
         self.retrain_model()
 
         return True, f"Rating added for Discord user '{discord_username}' on movie '{movie_title}'."
+    
+    async def movie_titles(self):
+        embed = discord.Embed(
+            title="Movie Titles", description="List of current movies in database:", color=0xBEBEFE
+        )
+
+        data = []
+        for movie in self.movie_titles.keys():
+            data.append(f"{movie.name}")
+        help_text = "\n".join(data)
+        embed.add_field(
+            name="Titles", value=f"```{help_text}```", inline=False
+        )
+        return True, embed
 
     # Executes the discord command to add a user
     @commands.hybrid_command(
@@ -128,6 +146,14 @@ class Recommend(commands.Cog, name="recommend"):
         success, message = await self.add_rating(ctx.author, movie_title, rating)
         await ctx.send(message)
 
+    @commands.hybrid_command(
+        name="movie_titles",
+        description="View all movie titles.",
+    )
+    async def movie_titles(self, ctx: commands.Context):
+        success, embed = await self.movie_titles()
+        await ctx.send(embed=embed)
+
     # Executes the discord command to provide a recommendation to the user based on a movie they appear to be asking about, requires user to already be registered via the add_user command
     @commands.hybrid_command(
         name="recommend",
@@ -142,9 +168,9 @@ class Recommend(commands.Cog, name="recommend"):
 
         user_id = self.username_mapping[discord_username]
 
-
         client = OpenAI(
-            api_key=OPEN_AI_API_KEY, 
+        base_url="https://openrouter.ai/api/v1",
+        api_key=f"{API_KEY}",
         )
 
         # Create a thread with the initial user message
@@ -152,19 +178,14 @@ class Recommend(commands.Cog, name="recommend"):
             messages=[
                 {
                     "role": "user",
-                    "content": partial_movie_name
+                    "content": f"{partial_movie_name}.\n Provide an answer off the basis that you are a simple reccomendation bot that only provides movie recommendations based on the user's input. Do not provide any other information or context."
                 }
             ]
         )
 
-        # Start a run with the assistant
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=OPEN_AI_ASSISTANTS_ID,
-        )
-
         # Wait for the assistant's response
         assistant_response = await self.wait_for_response(thread.id)
+        assistant_response = assistant_response + "\n (Powered by DeepSeek-R1)"
 
         if not assistant_response:
             await ctx.send("No response from the assistant. Please try again later.")
@@ -193,6 +214,8 @@ class Recommend(commands.Cog, name="recommend"):
         )
 
         await ctx.send(embed=embed)
+
+    
 
     async def wait_for_response(self, thread_id):
         """Wait for the assistant's response in the given thread."""
