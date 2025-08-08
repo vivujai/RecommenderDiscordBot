@@ -6,10 +6,11 @@ from fuzzywuzzy import process
 import os
 from openai import OpenAI
 import asyncio
+from dotenv import load_dotenv
 
 
-OPEN_AI_API_KEY = "YOUR OPENAI API KEY HERE!"
-OPEN_AI_ASSISTANTS_ID = "YOUR OPENAI ASSISTANTS ID HERE!"
+OPEN_AI_API_KEY = os.getenv("OPEN_AI_KEY")
+OPEN_AI_ASSISTANTS_ID = os.getenv("OPEN_ASSISTANT_ID")
 
 
 

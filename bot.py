@@ -285,9 +285,28 @@ class DiscordBot(commands.Bot):
             await context.send(embed=embed)
         else:
             raise error
+        
+    
+    
+
 
 
 load_dotenv()
 
 bot = DiscordBot()
 bot.run(os.getenv("TOKEN"))
+
+
+from discord.ext import commands
+
+OWNER_ID: str = os.getenv("OWNER_ID")
+
+# def is_true_owner():
+#     def predicate(ctx):
+#         return ctx.author.id == OWNER_ID
+#     return commands.check(predicate)
+
+# @bot.command()
+# @is_true_owner()
+# async def owner_command(ctx):
+#     await ctx.send("You are recognized as the owner!") 

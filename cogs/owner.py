@@ -9,13 +9,14 @@ Version: 6.1.0
 import discord
 from discord import app_commands
 from discord.ext import commands
+import os
 from discord.ext.commands import Context
 
 
 class Owner(commands.Cog, name="owner"):
     def __init__(self, bot) -> None:
         self.bot = bot
-
+ 
     @commands.command(
         name="sync",
         description="Synchonizes the slash commands.",
@@ -325,6 +326,12 @@ class Owner(commands.Cog, name="owner"):
             text=f"There {'is' if total == 1 else 'are'} now {total} {'user' if total == 1 else 'users'} in the blacklist"
         )
         await context.send(embed=embed)
+
+    
+        
+    
+
+    
 
 
 async def setup(bot) -> None:
