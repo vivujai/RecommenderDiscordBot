@@ -11,3 +11,6 @@ This command works consistently and will list all the movie titles in the ml-100
 
 Recommend:
 This function relies on deepseek-r1 as well, and as a result doesn't work consistently.
+
+earn.py
+inside earn.py, the work, crime, and gamble functions dont work, but you can use the profile and register function consistently
