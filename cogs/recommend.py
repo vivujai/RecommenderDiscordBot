@@ -2,6 +2,7 @@ import pandas as pd
 from surprise import Dataset, Reader, SVD
 import discord
 from discord.ext import commands
+from discord.ui import View, Button
 from fuzzywuzzy import process
 import os
 from openai import OpenAI
@@ -114,19 +115,29 @@ class Recommend(commands.Cog, name="recommend"):
 
         return True, f"Rating added for Discord user '{discord_username}' on movie '{movie_title}'."
     
-    async def movie_titles(self):
-        embed = discord.Embed(
-            title="Movie Titles", description="List of current movies in database:", color=0xBEBEFE
-        )
+    @staticmethod
+    def chunk_list(lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
 
-        data = []
-        for movie in self.movie_titles.keys():
-            data.append(f"{movie.name}")
-        help_text = "\n".join(data)
-        embed.add_field(
-            name="Titles", value=f"```{help_text}```", inline=False
-        )
-        return True, embed
+    async def list_titles(self):
+        titles = list(self.movie_titles.keys())
+        chunks = list(self.chunk_list(titles, 15))  # 50 titles per embed
+
+        embeds = []
+        for idx, chunk in enumerate(chunks):
+            help_text = "\n".join(chunk)
+            embed = discord.Embed(
+                title=f"Titles (Page {idx+1}/{len(chunks)})",
+                description=f"List of movies (showing {len(chunk)}):",
+                color=0xBEBEFE
+            )
+            embed.add_field(
+                name="Titles", value=f"```{help_text}```", inline=False
+            )
+            embeds.append(embed)
+        return True, embeds
 
     # Executes the discord command to add a user
     @commands.hybrid_command(
@@ -151,8 +162,12 @@ class Recommend(commands.Cog, name="recommend"):
         description="View all movie titles.",
     )
     async def movie_titles(self, ctx: commands.Context):
-        success, embed = await self.movie_titles()
-        await ctx.send(embed=embed)
+        success, embeds = await self.list_titles()
+        if not embeds:
+            await ctx.send("No titles found.")
+            return
+        view = MovieTitlesPaginator(embeds)
+        await ctx.send(embed=embeds[0], view=view)
 
     # Executes the discord command to provide a recommendation to the user based on a movie they appear to be asking about, requires user to already be registered via the add_user command
     @commands.hybrid_command(
@@ -174,18 +189,26 @@ class Recommend(commands.Cog, name="recommend"):
         )
 
         # Create a thread with the initial user message
-        thread = client.beta.threads.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"{partial_movie_name}.\n Provide an answer off the basis that you are a simple reccomendation bot that only provides movie recommendations based on the user's input. Do not provide any other information or context."
-                }
-            ]
-        )
+        try:
+            thread = client.beta.threads.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"{partial_movie_name}.\n Provide an answer off the basis that you are a simple reccomendation bot that only provides movie recommendations based on the user's input. Do not provide any other information or context."
+                    }
+                ]
+            )
+        except Exception as e:
+            print("Error creating thread:", str(e))
+            await ctx.send("An error occurred while creating the thread. Please try again later.")
 
         # Wait for the assistant's response
-        assistant_response = await self.wait_for_response(thread.id)
-        assistant_response = assistant_response + "\n (Powered by DeepSeek-R1)"
+        try:
+            assistant_response = await self.wait_for_response(thread)
+            assistant_response = assistant_response + "\n (Powered by DeepSeek-R1)"
+        except Exception as e:
+            await ctx.send(f"An error occurred. :(")
+            print(str(e))
 
         if not assistant_response:
             await ctx.send("No response from the assistant. Please try again later.")
@@ -225,6 +248,40 @@ class Recommend(commands.Cog, name="recommend"):
             if len(messages.data) > 1:  # Assuming the first message is the user's and the second is the assistant's
                 return messages.data[0].content  # Return the assistants content
 
+class MovieTitlesPaginator(View):
+    def __init__(self, embeds, timeout=60):
+        super().__init__(timeout=timeout)
+        self.embeds = embeds
+        self.current = 0
+        self.left.disabled = True  # left button off page 1
+        if len(embeds) == 1:
+            self.right.disabled = True  # right button off if only 1 page
+
+    @discord.ui.button(label="⬅️", style=discord.ButtonStyle.secondary)
+    async def left(self, interaction: discord.Interaction, button: Button):
+        if self.current > 0:
+            self.current -= 1
+            self.right.disabled = False
+            if self.current == 0:
+                self.left.disabled = True
+            else:
+                self.left.disabled = False
+            await interaction.response.edit_message(embed=self.embeds[self.current], view=self)
+
+    @discord.ui.button(label="➡️", style=discord.ButtonStyle.secondary)
+    async def right(self, interaction: discord.Interaction, button: Button):
+        if self.current < len(self.embeds) - 1:
+            self.current += 1
+            self.left.disabled = False
+            if self.current == len(self.embeds) - 1:
+                self.right.disabled = True
+            else:
+                self.right.disabled = False
+            await interaction.response.edit_message(embed=self.embeds[self.current], view=self)
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
 
 async def setup(bot) -> None:
     await bot.add_cog(Recommend(bot))
